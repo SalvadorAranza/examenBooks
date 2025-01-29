@@ -29,7 +29,6 @@ const Books = () => {
     const [data, setData] = useState([]);
     const [editorials, setEditorials] = useState([]);
     const [languages, setLanguages] = useState({});
-    const [dataEditorials, setDataEditorials] = useState({});
     const [modalInsert, setModalInsert] = useState(false);
     const [modalUpdate, setModalUpdate] = useState(false);
     const [modalDelete, setModalDelete] = useState(false);
@@ -62,10 +61,27 @@ const Books = () => {
 
     const handleChange = e => {
         const { name, value } = e.target;
-        setDataBook(prevState => ({
-            ...prevState,
-            [name]: value
-        }));
+        if (name === "ISBN") {
+            // Remover caracteres no numéricos
+            const numericValue = value.replace(/\D/g, "");
+    
+            // Aplicar formato ISBN-13 (978-X-XXXXX-XXX-X)
+            const formattedISBN = numericValue
+                .replace(/(\d{3})(\d{1})?(\d{5})?(\d{3})?(\d{1})?/, (match, p1, p2, p3, p4, p5) => {
+                    return [p1, p2, p3, p4, p5].filter(Boolean).join("-");
+                })
+                .substr(0, 17); // Limitar la longitud máxima con guiones
+    
+            setDataBook((prevState) => ({
+                ...prevState,
+                [name]: formattedISBN,
+            }));
+        } else {
+            setDataBook((prevState) => ({
+                ...prevState,
+                [name]: value,
+            }));
+        }
     };
 
     const validateForm = () => {
@@ -74,9 +90,9 @@ const Books = () => {
             newErrors.name = 'El nombre es requerido';
         }
         if (!dataBook.ISBN) {
-            newErrors.ISBN = 'El ISBN es requerido';
-        } else if (!/^\d{10,13}$/.test(dataBook.ISBN)) {
-            newErrors.ISBN = 'El ISBN debe ser un número de 10 a 13 dígitos';
+            newErrors.ISBN = "El ISBN es requerido";
+        } else if (!/^\d{3}-\d{1}-\d{5}-\d{3}-\d{1}$/.test(dataBook.ISBN)) {
+            newErrors.ISBN = "El ISBN debe tener el formato 978-X-XXXXX-XXX-X";
         }
 
         if (!dataBook.pages) {
@@ -139,7 +155,17 @@ const Books = () => {
             });
         } catch (error) {
             openCloseModalInsert();
-            Swal.fire("Atención!", `Error al Insertar el libro, ${error.message}`, "error");
+            if (error.response && error.response.data) {
+                switch (error.response.data.message) {
+                    case 'name should not be empty' :
+                        Swal.fire("Error!", `No se completo el registro: El campo nombre no puede estar vacio`, "error");
+                        break;
+                    case 'ISBN must be an ISBN"':
+                        Swal.fire("Error!", `El formato ISBN no es el correcto, por favor, ingrese uno valido`, "error");
+                    default:
+                        break;
+                }
+            }
         }
     };
 
@@ -226,7 +252,11 @@ const Books = () => {
 
     const selectDataBook = (book, caso) => {
         setDataBook(book);
-        (caso === 'Edit') ? setModalUpdate(true) : openCloseModalDelete()
+        if (caso === 'Edit') {
+            setModalUpdate(true);
+        } else if (caso === 'Delete') {
+            setModalDelete(true);
+        }
     };
 
     useEffect(() => {
@@ -274,7 +304,7 @@ const Books = () => {
                     ))}
                 </Select>
             </FormControl>
-            <TextField name="pages" fullWidth label="Paginas" onChange={handleChange} sx={{ mb: 2 }} error={!!errors.ISBN} helperText={errors.ISBN} />
+            <TextField name="pages" fullWidth label="Paginas" onChange={handleChange} sx={{ mb: 2 }} error={!!errors.pages} helperText={errors.pages} />
             <FormControl fullWidth sx={{ mb: 2 }}>
                 <InputLabel>Lenguaje</InputLabel>
                 <Select
